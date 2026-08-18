@@ -1,0 +1,55 @@
+name: gestion_finances
+description: >
+  Application de gestion des entrées et sorties financières de l'entreprise
+  (CRUD entrées/sorties, exports PDF mensuels/annuels, authentification,
+  configuration multi base de données).
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  # UI / icônes Material
+  cupertino_icons: ^1.0.6
+
+  # Gestion d'état
+  provider: ^6.1.2
+
+  # Connexion à la base de données MySQL (adresse IP configurable)
+  mysql_dart: 3.0.0
+
+  # Stockage local des paramètres (adresse IP, port, identifiants BD, devise...)
+  shared_preferences: ^2.2.3
+
+  # Génération et prévisualisation/partage des PDF
+  pdf: ^3.10.8
+  printing: ^5.12.0
+
+  # Formatage dates / devises
+  intl: ^0.20.2
+
+  # Hachage des mots de passe (authentification)
+  crypto: ^3.0.3
+
+  # Génération d'identifiants uniques côté client
+  uuid: ^4.4.0
+
+  # Connexion / inscription avec un compte Google
+  google_sign_in: ^6.2.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
+
