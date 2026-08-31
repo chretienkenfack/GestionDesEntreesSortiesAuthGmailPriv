@@ -37,12 +37,10 @@ dependencies:
   # Hachage des mots de passe (authentification)
   crypto: ^3.0.3
 
-  # Génération d'identifiants uniques côté client
   uuid: ^4.4.0
 
-  # Connexion / inscription avec un compte Google
+  # Authentification Google
   google_sign_in: ^6.2.1
-
 dev_dependencies:
   flutter_test:
     sdk: flutter

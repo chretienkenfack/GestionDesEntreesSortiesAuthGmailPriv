@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import '../services/google_auth_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/constants.dart';
 import '../utils/validators.dart';
-import '../widgets/google_sign_in_button.dart';
 import 'db_setup_screen.dart';
 import 'register_screen.dart';
-// TypeErreurGoogle est défini dans auth_provider.dart
+import 'role_selection_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -21,7 +21,6 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailCtrl = TextEditingController();
   final _motDePasseCtrl = TextEditingController();
   bool _motDePasseVisible = false;
-
 
   @override
   void dispose() {
@@ -44,107 +43,58 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  Future<void> _seConnecterAvecGoogle() async {
-    final auth = context.read<AuthProvider>();
-    final succes = await auth.connecterAvecGoogle();
-
-    if (!mounted) return;
-
-    // Annulation volontaire → rien à afficher
-    if (!succes && auth.erreur == null) return;
-
-    if (!succes && auth.erreur != null) {
-      // Erreur SHA-1 : dialog explicatif avec les étapes
-      if (auth.typeErreurGoogle == TypeErreurGoogle.sha1) {
-        _afficherDialogConfigGoogle();
-        return;
-      }
-
-      // Autres erreurs : SnackBar informatif
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.error_outline, color: Colors.white, size: 18),
-              const SizedBox(width: 10),
-              Expanded(child: Text(auth.erreur!)),
-            ],
-          ),
-          backgroundColor: AppTheme.couleurSortie,
-          behavior: SnackBarBehavior.floating,
-          margin: const EdgeInsets.all(16),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        ),
-      );
-    }
-  }
-
-  void _afficherDialogConfigGoogle() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: Colors.orange.shade50,
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Icon(Icons.settings_outlined,
-                  color: Colors.orange.shade700, size: 20),
-            ),
-            const SizedBox(width: 10),
-            const Text('Configuration requise',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'La connexion Google nécessite une configuration Firebase '
-              'pour cette application. Voici les étapes :',
-              style: TextStyle(fontSize: 13, color: Colors.black87),
-            ),
-            const SizedBox(height: 12),
-            _EtapeConfig(
-              numero: '1',
-              texte: 'Ouvrir un terminal dans le dossier du projet',
-              code: 'cd android',
-            ),
-            _EtapeConfig(
-              numero: '2',
-              texte: 'Obtenir l\'empreinte SHA-1',
-              code: 'gradlew signingReport',
-            ),
-            _EtapeConfig(
-              numero: '3',
-              texte:
-                  'Ajouter le SHA-1 dans Firebase Console → Paramètres du projet → Empreintes SHA',
-            ),
-            _EtapeConfig(
-              numero: '4',
-              texte:
-                  'Télécharger le nouveau google-services.json et le placer dans android/app/',
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Compris'),
-          ),
-        ],
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-    );
-  }
-
   void _allerVersInscription() {
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => const RegisterScreen()),
+    );
+  }
+
+  Future<void> _seConnecterGoogle() async {
+    final auth = context.read<AuthProvider>();
+    final googleAuth = GoogleAuthService();
+
+    final resultat = await googleAuth.obtenirCompte();
+    if (!mounted) return;
+
+    if (resultat.resultat != ResultatGoogle.succes || resultat.compte == null) {
+      if (resultat.messageErreur != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(resultat.messageErreur!),
+            backgroundColor: AppTheme.couleurSortie,
+          ),
+        );
+      }
+      return;
+    }
+
+    final compte = resultat.compte!;
+    final userTrouve = await auth.verifierUtilisateurGoogle(compte.email);
+    if (!mounted) return;
+
+    if (userTrouve != null) {
+      return;
+    }
+
+    if (auth.erreur != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(auth.erreur!),
+          backgroundColor: AppTheme.couleurSortie,
+        ),
+      );
+      return;
+    }
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => RoleSelectionScreen(
+          email: compte.email,
+          nom: compte.nom,
+          googleId: compte.googleId,
+          photoUrl: compte.photoUrl,
+        ),
+      ),
     );
   }
 
@@ -157,7 +107,6 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
-    final googleEnCours = auth.chargementGoogle;
 
     return Scaffold(
       body: Container(
@@ -250,33 +199,48 @@ class _LoginScreenState extends State<LoginScreen> {
                                       ),
                               ),
                             ),
-                            const SizedBox(height: 8),
+                            const SizedBox(height: 16),
+                            
+                            // ── SÉPARATEUR "OU" ──
+                            const Row(
+                              children: [
+                                Expanded(child: Divider(thickness: 1)),
+                                Padding(
+                                  padding: EdgeInsets.symmetric(horizontal: 10),
+                                  child: Text('OU', style: TextStyle(color: Colors.black45)),
+                                ),
+                                Expanded(child: Divider(thickness: 1)),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                            
+                            // ── BOUTON GOOGLE ──
+                            SizedBox(
+                              height: 48,
+                              child: OutlinedButton.icon(
+                                onPressed: auth.chargement ? null : _seConnecterGoogle,
+                                icon: Padding(
+                                  padding: const EdgeInsets.only(right: 8.0),
+                                  // Remplacement de l'icône G par un widget Icon basique 
+                                  // jusqu'à ce que des assets Google soient ajoutés.
+                                  child: Icon(Icons.g_mobiledata, size: 30, color: AppTheme.couleurPrimaire),
+                                ),
+                                label: const Text(
+                                  'Continuer avec Google',
+                                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.blueGrey),
+                                ),
+                                style: OutlinedButton.styleFrom(
+                                  side: const BorderSide(color: Colors.blueGrey),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
                             TextButton(
                               onPressed: auth.chargement ? null : _allerVersInscription,
                               child: const Text("Pas encore de compte ? S'inscrire"),
                             ),
                             const SizedBox(height: 4),
-                            Row(
-                              children: [
-                                Expanded(child: Divider(color: Colors.grey.shade300)),
-                                const Padding(
-                                  padding: EdgeInsets.symmetric(horizontal: 10),
-                                  child: Text('OU',
-                                      style: TextStyle(
-                                          color: Colors.black45, fontSize: 12)),
-                                ),
-                                Expanded(child: Divider(color: Colors.grey.shade300)),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            GoogleSignInButton(
-                              onPressed: (auth.chargement || googleEnCours)
-                                  ? null
-                                  : _seConnecterAvecGoogle,
-                              chargement: googleEnCours,
-                              texte: "Se connecter avec Google",
-                            ),
-                            const SizedBox(height: 12),
                             TextButton.icon(
                               onPressed: _ouvrirConfigurationDb,
                               icon: const Icon(Icons.storage_outlined, size: 16),
@@ -338,79 +302,6 @@ class _EnteteLogo extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-/// Ligne d'une étape de configuration dans le dialog Firebase
-class _EtapeConfig extends StatelessWidget {
-  final String numero;
-  final String texte;
-  final String? code;
-
-  const _EtapeConfig({
-    required this.numero,
-    required this.texte,
-    this.code,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 20,
-            height: 20,
-            decoration: BoxDecoration(
-              color: AppTheme.couleurAccent,
-              shape: BoxShape.circle,
-            ),
-            child: Center(
-              child: Text(
-                numero,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(texte,
-                    style: const TextStyle(fontSize: 12, color: Colors.black87)),
-                if (code != null) ...
-                  [
-                    const SizedBox(height: 3),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF0F2F8),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        code!,
-                        style: const TextStyle(
-                          fontFamily: 'monospace',
-                          fontSize: 11,
-                          color: Color(0xFF1A237E),
-                        ),
-                      ),
-                    ),
-                  ],
-              ],
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

@@ -9,9 +9,9 @@ CREATE TABLE IF NOT EXISTS users (
   id INT AUTO_INCREMENT PRIMARY KEY,
   nom VARCHAR(150) NOT NULL,
   email VARCHAR(150) NOT NULL UNIQUE,
-  password_hash VARCHAR(255) NULL, -- NULL si le compte a été créé via Google
+  password_hash VARCHAR(255) NULL,
   role ENUM('admin', 'agent') NOT NULL DEFAULT 'agent',
-  auth_provider ENUM('local', 'google') NOT NULL DEFAULT 'local',
+  auth_provider VARCHAR(20) NOT NULL DEFAULT 'local',
   google_id VARCHAR(255) NULL UNIQUE,
   photo_url VARCHAR(500) NULL,
   actif TINYINT(1) NOT NULL DEFAULT 1,

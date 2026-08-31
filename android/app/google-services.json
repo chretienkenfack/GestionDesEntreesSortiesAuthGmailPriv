@@ -1,31 +1,44 @@
 {
   "project_info": {
-    "project_number": "220669114835",
-    "project_id": "fifth-tensor-485512-b3",
-    "storage_bucket": "fifth-tensor-485512-b3.appspot.com"
+    "project_number": "758801892922",
+    "project_id": "engineers-801c1",
+    "storage_bucket": "engineers-801c1.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:220669114835:android:8a4e2f1c7b3d9e05",
+        "mobilesdk_app_id": "1:758801892922:android:f0b1a8ee115cf1cfb5d703",
         "android_client_info": {
           "package_name": "com.example.engineers"
         }
       },
       "oauth_client": [
         {
-          "client_id": "220669114835-n049v3a4oqgr3h2utvhupsc4b70dk3ne.apps.googleusercontent.com",
+          "client_id": "758801892922-mfl0vfvkgva9hg5q3hpilifv51phsvnc.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.engineers",
+            "certificate_hash": "f0c450cb1c6454f7b3269f2963404ea0d1f72550"
+          }
+        },
+        {
+          "client_id": "758801892922-ikfob7mq04f8cujlhnrhngo9uhdsb57i.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
       "api_key": [
         {
-          "current_key": "AIzaSyPlaceholder_RemplacerParVraieCle"
+          "current_key": "AIzaSyBdVAoGC75Hxea1yrWQ_5rkWuD_qre-5OE"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "758801892922-ikfob7mq04f8cujlhnrhngo9uhdsb57i.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }
