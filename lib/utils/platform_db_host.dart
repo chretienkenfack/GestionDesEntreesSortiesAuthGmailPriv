@@ -26,6 +26,7 @@ class PlatformDbHost {
   }
 
   static String get aideEmulateurAndroid =>
-      'Émulateur Android : utilisez 10.0.2.2 pour joindre MySQL sur votre PC.\n'
-      'Téléphone physique : utilisez l\'adresse IP locale du PC (ex : 192.168.1.10).';
+      '• Émulateur Android Studio : 10.0.2.2\n'
+      '• NoxPlayer : Utilisez l\'adresse IP locale de votre PC (ex: 192.168.1.XX)\n'
+      '• Smartphone physique : Utilisez l\'adresse IP locale de votre PC sur le même Wi-Fi.';
 }
