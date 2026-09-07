@@ -1,22 +1,21 @@
 import 'dart:async';
 import 'dart:io';
-import 'package:mysql_dart/mysql_dart.dart';
 import '../models/db_settings.dart';
 import '../utils/platform_db_host.dart';
-import 'db_connection.dart';
+import 'connection_factory.dart';
+import 'database_connection.dart';
 import 'settings_service.dart';
 
-/// Service singleton qui gère la connexion MySQL courante.
+/// Service singleton qui gère la connexion à la base de données (MySQL ou PostgreSQL).
 class DbService {
   DbService._internal();
   static final DbService instance = DbService._internal();
 
-  DbConnection? _connection;
-  MySQLConnection? _inner;
+  DatabaseConnection? _connection;
   DbSettings? _settingsUtilises;
   final SettingsService _settingsService = SettingsService();
 
-  Future<DbConnection> getConnection() async {
+  Future<DatabaseConnection> getConnection() async {
     final settingsActuels = await _settingsService.getDbSettings();
 
     final settingsOntChange = _settingsUtilises == null ||
@@ -24,22 +23,14 @@ class DbService {
         _settingsUtilises!.port != settingsActuels.port ||
         _settingsUtilises!.database != settingsActuels.database ||
         _settingsUtilises!.username != settingsActuels.username ||
-        _settingsUtilises!.password != settingsActuels.password;
+        _settingsUtilises!.password != settingsActuels.password ||
+        _settingsUtilises!.sgbdType != settingsActuels.sgbdType;
 
     if (_connection == null || settingsOntChange) {
       await _fermerConnexionExistante();
       final host = PlatformDbHost.hostEffectif(settingsActuels.host);
-      _inner = await MySQLConnection.createConnection(
-        host: host,
-        port: settingsActuels.port,
-        userName: settingsActuels.username,
-        password: settingsActuels.password,
-        databaseName: settingsActuels.database,
-        secure: false,
-        allowPublicKeyRetrieval: true,
-      );
       try {
-        await _inner!.connect().timeout(
+        _connection = await ConnectionFactory.create(settingsActuels).timeout(
           const Duration(seconds: 5),
           onTimeout: () {
             throw TimeoutException(
@@ -50,7 +41,6 @@ class DbService {
         await _fermerConnexionExistante();
         rethrow;
       }
-      _connection = DbConnection(_inner!);
       _settingsUtilises = settingsActuels;
     }
     return _connection!;
@@ -61,25 +51,14 @@ class DbService {
       await _connection?.close();
     } catch (_) {}
     _connection = null;
-    _inner = null;
   }
 
   /// Retourne `DbTestResult` avec le détail précis en cas d'erreur.
   Future<DbTestResult> tester(DbSettings settings) async {
-    MySQLConnection? conn;
+    DatabaseConnection? conn;
     final host = PlatformDbHost.hostEffectif(settings.host);
     try {
-      conn = await MySQLConnection.createConnection(
-        host: host,
-        port: settings.port,
-        userName: settings.username,
-        password: settings.password,
-        databaseName: settings.database,
-        secure: false,
-        allowPublicKeyRetrieval: true,
-      );
-
-      await conn.connect().timeout(
+      conn = await ConnectionFactory.create(settings).timeout(
         const Duration(seconds: 5),
         onTimeout: () {
           throw TimeoutException(
@@ -90,7 +69,7 @@ class DbService {
         },
       );
 
-      await conn.execute('SELECT 1').timeout(const Duration(seconds: 3));
+      await conn.query('SELECT 1').timeout(const Duration(seconds: 3));
       return const DbTestResult(succes: true);
     } on TimeoutException catch (e) {
       return DbTestResult(succes: false, message: e.message);

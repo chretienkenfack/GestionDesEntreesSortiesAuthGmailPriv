@@ -24,6 +24,9 @@ dependencies:
   # Connexion à la base de données MySQL (adresse IP configurable)
   mysql_dart: 3.0.0
 
+  # Connexion à la base de données PostgreSQL
+  postgres: ^2.6.2
+
   # Stockage local des paramètres (adresse IP, port, identifiants BD, devise...)
   shared_preferences: ^2.2.3
 

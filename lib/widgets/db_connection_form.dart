@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import '../models/db_settings.dart';
+import '../services/connection_factory.dart';
 import '../services/db_service.dart';
 import '../services/settings_service.dart';
 import '../utils/platform_db_host.dart';
 import '../utils/validators.dart';
 
-/// Formulaire de connexion MySQL réutilisable (écran Paramètres ou
-/// configuration avant la première connexion).
+/// Formulaire de connexion réutilisable pour MySQL et PostgreSQL
+/// (écran Paramètres ou configuration avant la première connexion).
 class DbConnectionForm extends StatefulWidget {
   const DbConnectionForm({super.key});
 
@@ -24,6 +25,7 @@ class _DbConnectionFormState extends State<DbConnectionForm> {
   final _userCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
 
+  String _sgbdType = 'mysql';
   bool _chargement = true;
   bool _testEnCours = false;
   bool _enregistrementEnCours = false;
@@ -51,6 +53,7 @@ class _DbConnectionFormState extends State<DbConnectionForm> {
     _dbCtrl.text = db.database;
     _userCtrl.text = db.username;
     _passwordCtrl.text = db.password;
+    _sgbdType = db.sgbdType;
     setState(() => _chargement = false);
   }
 
@@ -60,7 +63,17 @@ class _DbConnectionFormState extends State<DbConnectionForm> {
         database: _dbCtrl.text.trim(),
         username: _userCtrl.text.trim(),
         password: _passwordCtrl.text,
+        sgbdType: _sgbdType,
       );
+
+  void _onSgbdTypeChanged(String? value) {
+    if (value != null) {
+      setState(() {
+        _sgbdType = value;
+        _portCtrl.text = ConnectionFactory.getDefaultPort(value);
+      });
+    }
+  }
 
   Future<void> _testerConnexion() async {
     if (!_formKey.currentState!.validate()) return;
@@ -121,6 +134,20 @@ class _DbConnectionFormState extends State<DbConnectionForm> {
             ),
           ),
           const SizedBox(height: 16),
+          DropdownButtonFormField<String>(
+            value: _sgbdType,
+            decoration: const InputDecoration(
+              labelText: 'Type de SGBD',
+              prefixIcon: Icon(Icons.storage_outlined),
+            ),
+            items: const [
+              DropdownMenuItem(value: 'mysql', child: Text('MySQL')),
+              DropdownMenuItem(value: 'postgres', child: Text('PostgreSQL')),
+              DropdownMenuItem(value: 'sqlserver', child: Text('SQL Server (MS SQL)')),
+            ],
+            onChanged: _onSgbdTypeChanged,
+          ),
+          const SizedBox(height: 12),
           TextFormField(
             controller: _hostCtrl,
             decoration: const InputDecoration(

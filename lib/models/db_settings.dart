@@ -7,6 +7,7 @@ class DbSettings {
   final String database;
   final String username;
   final String password;
+  final String sgbdType; // 'mysql' ou 'postgres'
 
   const DbSettings({
     required this.host,
@@ -14,6 +15,7 @@ class DbSettings {
     required this.database,
     required this.username,
     required this.password,
+    this.sgbdType = 'mysql',
   });
 
   factory DbSettings.defaults() => const DbSettings(
@@ -22,6 +24,7 @@ class DbSettings {
         database: 'gestion_finances',
         username: 'root',
         password: '',
+        sgbdType: 'mysql',
       );
 
   Map<String, dynamic> toMap() => {
@@ -30,6 +33,7 @@ class DbSettings {
         'database': database,
         'username': username,
         'password': password,
+        'sgbdType': sgbdType,
       };
 
   factory DbSettings.fromMap(Map<String, dynamic> map) {
@@ -49,6 +53,7 @@ class DbSettings {
       database: map['database']?.toString() ?? 'gestion_finances',
       username: map['username']?.toString() ?? 'root',
       password: map['password']?.toString() ?? '',
+      sgbdType: map['sgbdType']?.toString() ?? 'mysql',
     );
   }
 
@@ -58,6 +63,7 @@ class DbSettings {
     String? database,
     String? username,
     String? password,
+    String? sgbdType,
   }) {
     return DbSettings(
       host: host ?? this.host,
@@ -65,6 +71,7 @@ class DbSettings {
       database: database ?? this.database,
       username: username ?? this.username,
       password: password ?? this.password,
+      sgbdType: sgbdType ?? this.sgbdType,
     );
   }
 }

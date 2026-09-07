@@ -11,8 +11,15 @@ class AuthException implements Exception {
 }
 
 class AuthService {
-  static const String _colonnes =
-      'id, nom, email, role, auth_provider, photo_url, actif';
+  static const List<String> _colonnesList = [
+    'id',
+    'nom',
+    'email',
+    'role',
+    'auth_provider',
+    'photo_url',
+    'actif',
+  ];
 
   String _hash(String motDePasse) {
     return sha256.convert(utf8.encode(motDePasse)).toString();
@@ -21,10 +28,14 @@ class AuthService {
   /// Authentifie un utilisateur par e-mail et mot de passe (compte local).
   Future<AppUser> login(String email, String motDePasse) async {
     final conn = await DbService.instance.getConnection();
-    final resultats = await conn.query(
-      'SELECT $_colonnes, password_hash FROM users WHERE email = ? LIMIT 1',
-      [email.trim()],
-    );
+    final query = conn.queryBuilder
+        .select([..._colonnesList, 'password_hash'])
+        .from('users')
+        .whereRaw('email = ?', [email.trim()])
+        .limit(1)
+        .build();
+
+    final resultats = await conn.query(query.sql, query.params);
 
     if (resultats.isEmpty) {
       throw AuthException('Adresse e-mail ou mot de passe incorrect.');
@@ -47,8 +58,6 @@ class AuthService {
   }
 
   /// Inscription libre : un nouvel utilisateur crée lui-même son compte.
-  /// Le rôle est toujours 'agent' par défaut ; seul un administrateur
-  /// peut ensuite promouvoir un compte en 'admin'.
   Future<AppUser> inscrire({
     required String nom,
     required String email,
@@ -56,36 +65,52 @@ class AuthService {
   }) async {
     final conn = await DbService.instance.getConnection();
 
-    final existant = await conn.query(
-      'SELECT id FROM users WHERE email = ? LIMIT 1',
-      [email.trim()],
-    );
+    final checkQuery = conn.queryBuilder
+        .select(['id'])
+        .from('users')
+        .whereRaw('email = ?', [email.trim()])
+        .limit(1)
+        .build();
+
+    final existant = await conn.query(checkQuery.sql, checkQuery.params);
     if (existant.isNotEmpty) {
       throw AuthException('Un compte existe déjà avec cette adresse e-mail.');
     }
 
-    final result = await conn.query(
-      '''
-      INSERT INTO users (nom, email, password_hash, role, auth_provider)
-      VALUES (?, ?, ?, 'agent', 'local')
-      ''',
-      [nom.trim(), email.trim(), _hash(motDePasse)],
-    );
+    final insertQuery = conn.queryBuilder.insertInto('users', {
+      'nom': nom.trim(),
+      'email': email.trim(),
+      'password_hash': _hash(motDePasse),
+      'role': 'agent',
+      'auth_provider': 'local',
+    });
+
+    final result = await conn.query(insertQuery.sql, insertQuery.params);
 
     final id = result.insertId!;
-    final resultats = await conn.query(
-      'SELECT $_colonnes FROM users WHERE id = ?',
-      [id],
-    );
+    final selectQuery = conn.queryBuilder
+        .select(_colonnesList)
+        .from('users')
+        .whereRaw('id = ?', [id])
+        .build();
+
+    final resultats = await conn.query(selectQuery.sql, selectQuery.params);
     return AppUser.fromRow(resultats.first.fields);
   }
 
   Future<void> changerMotDePasse(int userId, String nouveauMotDePasse) async {
     final conn = await DbService.instance.getConnection();
-    await conn.query(
-      "UPDATE users SET password_hash = ?, auth_provider = 'local' WHERE id = ?",
-      [_hash(nouveauMotDePasse), userId],
+    final updateQuery = conn.queryBuilder.update(
+      'users',
+      {
+        'password_hash': _hash(nouveauMotDePasse),
+        'auth_provider': 'local',
+      },
+      where: 'id = ?',
+      whereParams: [userId],
     );
+
+    await conn.query(updateQuery.sql, updateQuery.params);
   }
 
   /// Réservé aux administrateurs : création directe d'un compte.
@@ -96,28 +121,33 @@ class AuthService {
     required String role,
   }) async {
     final conn = await DbService.instance.getConnection();
-    await conn.query(
-      "INSERT INTO users (nom, email, password_hash, role, auth_provider) VALUES (?, ?, ?, ?, 'local')",
-      [nom, email.trim(), _hash(motDePasse), role],
-    );
+    final insertQuery = conn.queryBuilder.insertInto('users', {
+      'nom': nom,
+      'email': email.trim(),
+      'password_hash': _hash(motDePasse),
+      'role': role,
+      'auth_provider': 'local',
+    });
+
+    await conn.query(insertQuery.sql, insertQuery.params);
   }
 
   /// 1. Callback OAuth pour vérifier si l'utilisateur existe
-  /// Retourne un AppUser s'il existe (Connexion),
-  /// ou `null` s'il n'existe pas (le front devra rediriger vers le choix du rôle).
   Future<AppUser?> checkGoogleUser(String email) async {
     final conn = await DbService.instance.getConnection();
-    final resultats = await conn.query(
-      'SELECT $_colonnes FROM users WHERE email = ? LIMIT 1',
-      [email.trim()],
-    );
+    final query = conn.queryBuilder
+        .select(_colonnesList)
+        .from('users')
+        .whereRaw('email = ?', [email.trim()])
+        .limit(1)
+        .build();
+
+    final resultats = await conn.query(query.sql, query.params);
 
     if (resultats.isEmpty) {
-      // L'utilisateur n'existe pas, on retourne null.
       return null;
     }
 
-    // L'utilisateur existe déjà, on le connecte
     return AppUser.fromRow(resultats.first.fields);
   }
 
@@ -131,30 +161,37 @@ class AuthService {
   }) async {
     final conn = await DbService.instance.getConnection();
 
-    // Au cas où une double tentative est faite (sécurité)
-    final existant = await conn.query(
-      'SELECT id FROM users WHERE email = ? LIMIT 1',
-      [email.trim()],
-    );
+    final checkQuery = conn.queryBuilder
+        .select(['id'])
+        .from('users')
+        .whereRaw('email = ?', [email.trim()])
+        .limit(1)
+        .build();
 
+    final existant = await conn.query(checkQuery.sql, checkQuery.params);
     if (existant.isNotEmpty) {
       throw AuthException('Cet utilisateur existe déjà.');
     }
 
-    final result = await conn.query(
-      '''
-      INSERT INTO users (nom, email, role, auth_provider, google_id, photo_url)
-      VALUES (?, ?, ?, 'google', ?, ?)
-      ''',
-      [nom.trim(), email.trim(), role, googleId, photoUrl],
-    );
+    final insertQuery = conn.queryBuilder.insertInto('users', {
+      'nom': nom.trim(),
+      'email': email.trim(),
+      'role': role,
+      'auth_provider': 'google',
+      'google_id': googleId,
+      'photo_url': photoUrl,
+    });
+
+    final result = await conn.query(insertQuery.sql, insertQuery.params);
 
     final id = result.insertId!;
-    final resultats = await conn.query(
-      'SELECT $_colonnes FROM users WHERE id = ?',
-      [id],
-    );
+    final selectQuery = conn.queryBuilder
+        .select(_colonnesList)
+        .from('users')
+        .whereRaw('id = ?', [id])
+        .build();
 
+    final resultats = await conn.query(selectQuery.sql, selectQuery.params);
     return AppUser.fromRow(resultats.first.fields);
   }
 }
